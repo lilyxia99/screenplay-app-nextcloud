@@ -35,10 +35,11 @@ var st = {
 
 /* ════ Fountain ════ */
 function blocksToFountain(blocks) {
-  var out = [];
+  var out = [], prevType = null;
   blocks.forEach(function(b) {
     var t = b.type, s = b.text.trim();
-    if (!s) return;
+    if (!s) { prevType = t; return; }
+
     if (t === 'scene-heading') {
       out.push('');
       out.push(/^(INT|EXT|INT\.\/EXT|I\/E)[\s\.]/i.test(s) ? s.toUpperCase() : '.' + s.toUpperCase());
@@ -48,13 +49,19 @@ function blocksToFountain(blocks) {
       out.push(s);
       out.push('');
     } else if (t === 'character') {
-      out.push('');
+      // 如果前一个是对话或括注，说明是角色→对话→角色新段落，不需要在角色前加空行
+      if (prevType !== 'dialogue' && prevType !== 'parenthetical') {
+        out.push('');
+      }
       out.push(s.toUpperCase());
     } else if (t === 'parenthetical') {
       out.push(s.startsWith('(') ? s : '(' + s + ')');
     } else if (t === 'dialogue') {
+      // 如果前一个也是对话，说明是同一段对话的多个段落，加一个空行分隔
+      if (prevType === 'dialogue') {
+        out.push('');
+      }
       out.push(s);
-      // 不加空行，保持连续对话
     } else if (t === 'transition') {
       out.push('');
       out.push('> ' + s.toUpperCase());
@@ -63,6 +70,7 @@ function blocksToFountain(blocks) {
       out.push(s);
       out.push('');
     }
+    prevType = t;
   });
   return out.join('\n').replace(/\n{3,}/g, '\n\n').trim();
 }
@@ -275,7 +283,7 @@ function openEditor(path, title, blocks) {
 
   var lastSavedDisp = h('span', 'sp-last-saved', '');
   lastSavedDisp.id = 'sp-last-saved';
-  lastSavedDisp.setAttribute('style', 'font-size:11px;color:#6c7086;margin-left:8px;flex:1;text-align:right;');
+  //lastSavedDisp.setAttribute('style', 'font-size:11px;color:#6c7086;margin-left:8px;flex:1;text-align:right;'); // moved to CSS
   topbar.appendChild(lastSavedDisp);
 
   // auto-save every 30 seconds
