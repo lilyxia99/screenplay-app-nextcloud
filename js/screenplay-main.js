@@ -518,6 +518,12 @@
       // 不在这里 autoH，放入统一计算，避免触发布局抖动
     });
 
+    // 批量设置高度避免重排导致卡顿
+    var allTas = Array.from(blocksEl.querySelectorAll('textarea'));
+    allTas.forEach(function (ta) { ta.style.height = 'auto'; });
+    var newHeights = allTas.map(function (ta) { return ta.scrollHeight; });
+    allTas.forEach(function (ta, i) { ta.style.height = newHeights[i] + 'px'; });
+
     if (area) {
       area.scrollTop = stTop;
     }
@@ -589,8 +595,11 @@
 
   // 修改原有的 autoH 并在末尾触发计算
   function autoH(ta) {
-    ta.style.height = 'auto';
-    ta.style.height = ta.scrollHeight + 'px';
+    var oldScrollTop = ta.scrollTop;
+    ta.style.height = 'auto'; // 折叠至单行计算真实大小
+    ta.style.height = ta.scrollHeight + 'px'; // 根据真实文字多寡设置固定高度
+    ta.scrollTop = oldScrollTop;
+
     // 只要文字变多导致高度变化，就重算分页
     scheduleUpdatePageBreaks();
   }
