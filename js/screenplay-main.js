@@ -166,8 +166,13 @@
   }
 
   function saveFileToDav(path, content) {
-    return ensureFolder().then(function () {
-      return davFetch('PUT', path, content);
+    return davFetch('PUT', path, content).then(function (res) {
+      if (res.status === 409) {
+        return ensureFolder().then(function () {
+          return davFetch('PUT', path, content);
+        });
+      }
+      return res;
     }).then(function (res) {
       if (!res.ok && res.status !== 201 && res.status !== 204) throw new Error('HTTP ' + res.status);
       return true;
