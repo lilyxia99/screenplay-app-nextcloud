@@ -462,7 +462,26 @@
 
       if (st.selectionMode) {
         var sel = h('span', 'sp-select-indicator' + (isSel ? ' sp-selected' : ''), isSel ? '✓' : '○');
-        sel.addEventListener('click', (function (i) { return function () { toggleSel(i); }; })(idx));
+
+        // 鼠标按下：可以是普通单选，也可以是 Shift 多选，同时开启拖拽模式
+        sel.addEventListener('mousedown', (function (i, currentIsSel) {
+          return function (e) {
+            e.preventDefault(); // 防止选中文本当作原生拖拽
+            isDraggingSelection = true;
+            dragSelState = !currentIsSel; // 拖拽的过程是选中还是取消，取决于按下的那一下
+            toggleSel(i, e.shiftKey, false, null);
+          };
+        })(idx, isSel));
+
+        // 鼠标进入（拖拽经过）：如果正在拖拽，应用拖拽的选中/取消状态
+        sel.addEventListener('mouseenter', (function (i) {
+          return function (e) {
+            if (isDraggingSelection) {
+              toggleSel(i, false, true, dragSelState);
+            }
+          };
+        })(idx));
+
         wrap.appendChild(sel);
       } else if (st.focusedIdx === idx) {
         wrap.appendChild(h('span', 'sp-block-label', tShort(block.type)));
@@ -688,11 +707,45 @@
   }
 
   /* ── batch ── */
-  function toggleSel(idx) {
-    var p = st.selectedBlocks.indexOf(idx);
-    if (p >= 0) st.selectedBlocks.splice(p, 1); else st.selectedBlocks.push(idx);
+  var lastSelectedIdx = -1;
+  var isDraggingSelection = false;
+  var dragSelState = true; // true = selecting, false = deselecting
+
+  function toggleSel(idx, isShift, isDragEnter, forceState) {
+    if (isDragEnter) {
+      // Dragging over an item: apply the state we started the drag with
+      var p = st.selectedBlocks.indexOf(idx);
+      if (forceState && p < 0) st.selectedBlocks.push(idx);
+      if (!forceState && p >= 0) st.selectedBlocks.splice(p, 1);
+      lastSelectedIdx = idx;
+      renderBlocks(); renderBar();
+      return;
+    }
+
+    if (isShift && lastSelectedIdx >= 0) {
+      // Shift-click: select range
+      var start = Math.min(lastSelectedIdx, idx);
+      var end = Math.max(lastSelectedIdx, idx);
+      var adding = st.selectedBlocks.indexOf(lastSelectedIdx) >= 0 || st.selectedBlocks.indexOf(idx) < 0;
+      for (var i = start; i <= end; i++) {
+        var p = st.selectedBlocks.indexOf(i);
+        if (adding && p < 0) st.selectedBlocks.push(i);
+        else if (!adding && p >= 0) st.selectedBlocks.splice(p, 1);
+      }
+    } else {
+      // Normal click
+      var p = st.selectedBlocks.indexOf(idx);
+      if (p >= 0) st.selectedBlocks.splice(p, 1); else st.selectedBlocks.push(idx);
+    }
+    lastSelectedIdx = idx;
     renderBlocks(); renderBar();
   }
+
+  // Handle global drag selection stop
+  document.addEventListener('mouseup', function () {
+    isDraggingSelection = false;
+  });
+
   function copyS() {
     if (!st.selectedBlocks.length) return;
     st.clipboard = st.selectedBlocks.slice().sort(function (a, b) { return a - b; })
