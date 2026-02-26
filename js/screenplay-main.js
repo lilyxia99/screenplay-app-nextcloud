@@ -48,9 +48,9 @@ function blocksToFountain(blocks) {
       out.push(s.startsWith('(') ? s : '(' + s + ')');
     } else if (t === 'dialogue') {
       // 如果前一个也是对话，说明是同一段对话的多个段落，加一个空行分隔
-      if (prevType === 'dialogue') {
+      /*if (prevType === 'dialogue') {
         out.push('');
-      }
+      }*/
       out.push(s);
     } else if (t === 'transition') {
       out.push('');
