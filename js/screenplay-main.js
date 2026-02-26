@@ -348,30 +348,40 @@ function showExportModal() {
 
     modal.querySelector('#p-cancel').onclick = function() { overlay.remove(); };
     modal.querySelector('#p-exec').onclick = function() {
-        var size = modal.querySelector('#psize').value;
-        var margin = modal.querySelector('#pmargin').value + 'in';
-        overlay.remove();
-        
-        // 准备打印内容
-        var printArea = document.getElementById('print-area') || h('div');
+    var size = modal.querySelector('#psize').value;
+    var margin = modal.querySelector('#pmargin').value + 'in';
+    overlay.remove();
+    
+    // 1. 获取或创建打印容器
+    var printArea = document.getElementById('print-area');
+    if (!printArea) {
+        printArea = document.createElement('div');
         printArea.id = 'print-area';
-        printArea.innerHTML = '';
-        
-        // 设置 CSS 变量给 @page 使用
-        document.documentElement.style.setProperty('--print-size', size);
-        document.documentElement.style.setProperty('--print-margin', margin);
-
-        // 转换 blocks 为打印节点
-        st.blocks.forEach(function(b) {
-            if (!b.text.trim()) return;
-            var div = h('div', 'p-block p-' + b.type, b.text);
-            printArea.appendChild(div);
-        });
-        
         document.body.appendChild(printArea);
+    }
+    printArea.innerHTML = ''; // 清空旧内容
+    
+    // 2. 设置打印参数
+    document.documentElement.style.setProperty('--print-size', size);
+    document.documentElement.style.setProperty('--print-margin', margin);
+
+    // 3. 构建打印内容
+    st.blocks.forEach(function(b) {
+        var text = b.text.trim();
+        // 如果是空的对话或动作，打印时跳过，除非是场景标题
+        if (!text && b.type !== 'scene-heading') return;
+        
+        var div = document.createElement('div');
+        div.className = 'p-block p-' + b.type;
+        div.textContent = text;
+        printArea.appendChild(div);
+    });
+    
+    // 4. 给浏览器一点时间渲染 DOM 再调用打印
+    setTimeout(function() {
         window.print();
-    };
-}
+    }, 250);
+};
 
 function reloadList() {
   if (st.autoSaveTimer) { clearInterval(st.autoSaveTimer); st.autoSaveTimer = null; }

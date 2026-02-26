@@ -367,15 +367,19 @@
 
 /* 3. 打印专用样式 (PDF标准) */
 @media print {
-    /* 彻底隐藏编辑器所有 UI */
+    /* 1. 确保 body 和容器允许长内容溢出到多页 */
+    html, body {
+        height: auto !important;
+        overflow: visible !important;
+    }
+
     body > *:not(#print-area) {
         display: none !important;
     }
 
     #print-area {
         display: block !important;
-        position: absolute;
-        left: 0; top: 0;
+        position: relative; /* 改为 relative 确保流式布局 */
         width: 100%;
         background: #fff !important;
         color: #000 !important;
@@ -388,19 +392,34 @@
         size: var(--print-size, A4);
     }
 
-    /* 强制重置剧本块在纸张上的位置，覆盖响应式百分比 */
+    /* 2. 防止文字被横切的核心设置 */
     .p-block {
         margin: 0;
         line-height: 1.2;
         white-space: pre-wrap;
         padding: 6pt 0;
         width: 100% !important;
-        text-align: left;
+        
+        /* 告诉浏览器：不要在元素中间断页 */
+        break-inside: avoid; 
+        page-break-inside: avoid; 
     }
 
-    .p-scene-heading { font-weight: bold; text-transform: uppercase; margin-top: 24pt; }
-    .p-action { margin-top: 12pt; }
-    .p-character { width: 4in !important; margin-left: 2in !important; text-align: center; text-transform: uppercase; margin-top: 12pt; }
+    /* 3. 针对剧本特定格式的打印优化 */
+    .p-scene-heading { 
+        font-weight: bold; 
+        text-transform: uppercase; 
+        margin-top: 24pt; 
+        break-after: avoid; /* 场景标题后不要立即断页，至少带一行动作 */
+    }
+    .p-character { 
+        width: 4in !important; 
+        margin-left: 2in !important; 
+        text-align: center; 
+        text-transform: uppercase; 
+        margin-top: 12pt;
+        break-after: avoid; /* 角色名后不要立即断页 */
+    }
     .p-parenthetical { width: 3in !important; margin-left: 2.5in !important; font-size: 11pt; }
     .p-dialogue { width: 4in !important; margin-left: 1.5in !important; }
     .p-transition { text-align: right; text-transform: uppercase; margin-top: 12pt; }
