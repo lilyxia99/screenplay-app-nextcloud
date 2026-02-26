@@ -1,0 +1,297 @@
+/**
+ * Screenplay Writer
+ */
+
+const TYPES = [
+	{ id: 'scene-heading', label: '場景標題', shortLabel: '場景', hint: 'INT./EXT. 場所 - 時間' },
+	{ id: 'action', label: '動作', shortLabel: '動作', hint: '動作描述' },
+	{ id: 'character', label: '角色', shortLabel: '角色', hint: '角色名稱 (大寫)' },
+	{ id: 'parenthetical', label: '括注', shortLabel: '括注', hint: '(語氣/動作)' },
+	{ id: 'dialogue', label: '對話', shortLabel: '對話', hint: '角色台詞' },
+	{ id: 'transition', label: '轉場', shortLabel: '轉場', hint: '轉場效果' },
+	{ id: 'general', label: '一般', shortLabel: '一般', hint: '一般文字' },
+]
+
+const STORAGE_KEY = 'screenplay_data'
+
+// Nextcloud inlines this script after the DOM is ready, so DOMContentLoaded
+// has already fired. Call initApp directly, with a small timeout as safety net.
+(function() {
+	function tryInit() {
+		const app = document.getElementById('app-content-vue')
+		if (app && typeof Vue !== 'undefined') {
+			initApp()
+		} else {
+			setTimeout(tryInit, 50)
+		}
+	}
+	if (document.readyState === 'loading') {
+		document.addEventListener('DOMContentLoaded', tryInit)
+	} else {
+		tryInit()
+	}
+})()
+
+function initApp() {
+	new Vue({
+		el: '#app-content-vue',
+		data() {
+			const saved = (() => {
+				try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) } catch(e) { return null }
+			})()
+			return {
+				blocks: (saved && saved.blocks) || [{ id: 1, type: 'scene-heading', text: 'INT. 場景 - 日' }],
+				scriptTitle: (saved && saved.title) || '未命名劇本',
+				focusedIdx: 0,
+				hasUnsavedChanges: false,
+				isMobile: window.innerWidth < 768,
+				elementTypes: TYPES,
+				// batch edit
+				selectionMode: false,
+				selectedBlocks: [],
+				clipboard: [],
+				_nextId: (saved && saved.blocks) ? (Math.max(...saved.blocks.map(b => b.id || 0)) + 1) : 2,
+			}
+		},
+		computed: {
+			currentBlockType() {
+				if (this.focusedIdx >= 0 && this.focusedIdx < this.blocks.length) {
+					return this.blocks[this.focusedIdx].type
+				}
+				return 'action'
+			},
+			canPaste() {
+				return this.clipboard.length > 0
+			},
+			canActOnSelection() {
+				return this.selectedBlocks.length > 0
+			},
+		},
+		methods: {
+			newBlock(type, text = '') {
+				return { id: this._nextId++, type, text }
+			},
+			addBlock(type = 'action') {
+				const idx = this.focusedIdx >= 0 ? this.focusedIdx + 1 : this.blocks.length
+				this.blocks.splice(idx, 0, this.newBlock(type))
+				this.focusedIdx = idx
+				this.$nextTick(() => {
+					this.focusBlock(idx)
+				})
+			},
+			focusBlock(idx) {
+				const ta = this.$refs['ta-' + idx]
+				const el = Array.isArray(ta) ? ta[0] : ta
+				if (el) el.focus()
+			},
+			setCurrentType(type) {
+				if (this.focusedIdx >= 0 && this.focusedIdx < this.blocks.length) {
+					this.blocks[this.focusedIdx].type = type
+					this.$nextTick(() => this.focusBlock(this.focusedIdx))
+				}
+			},
+			onKeydown(e, idx) {
+				const b = this.blocks[idx]
+				if (e.key === 'Enter' && !e.shiftKey) {
+					e.preventDefault()
+					let nextType = 'action'
+					if (b.type === 'scene-heading') nextType = 'action'
+					else if (b.type === 'action') nextType = 'character'
+					else if (b.type === 'character') nextType = 'dialogue'
+					else if (b.type === 'dialogue') nextType = 'action'
+					else if (b.type === 'parenthetical') nextType = 'dialogue'
+					this.addBlock(nextType)
+				}
+				if (e.key === 'Tab') {
+					e.preventDefault()
+					const typeIds = this.elementTypes.map(t => t.id)
+					const currentIdx = typeIds.indexOf(b.type)
+					b.type = typeIds[(currentIdx + 1) % typeIds.length]
+				}
+				if (e.key === 'Backspace' && b.text === '' && this.blocks.length > 1) {
+					e.preventDefault()
+					this.blocks.splice(idx, 1)
+					const newIdx = Math.max(0, idx - 1)
+					this.focusedIdx = newIdx
+					this.$nextTick(() => this.focusBlock(newIdx))
+				}
+			},
+			onInput(e, idx) {
+				this.hasUnsavedChanges = true
+				const ta = e.target
+				ta.style.height = 'auto'
+				ta.style.height = ta.scrollHeight + 'px'
+				this.autoSave()
+			},
+			onFocus(idx) {
+				this.focusedIdx = idx
+			},
+			onBlockClick(idx) {
+				if (this.selectionMode) {
+					this.toggleBlockSelection(idx)
+				}
+			},
+			placeholder(type) {
+				const t = this.elementTypes.find(t => t.id === type)
+				return t ? t.hint : ''
+			},
+			shortLabel(type) {
+				const t = this.elementTypes.find(t => t.id === type)
+				return t ? t.shortLabel : type
+			},
+			isSelected(idx) {
+				return this.selectedBlocks.indexOf(idx) >= 0
+			},
+
+			// ── batch edit ──────────────────────────────────
+			toggleSelectionMode() {
+				this.selectionMode = !this.selectionMode
+				this.selectedBlocks = []
+			},
+			toggleBlockSelection(idx) {
+				const pos = this.selectedBlocks.indexOf(idx)
+				if (pos >= 0) {
+					this.selectedBlocks.splice(pos, 1)
+				} else {
+					this.selectedBlocks.push(idx)
+				}
+			},
+			copySelected() {
+				if (!this.selectedBlocks.length) return
+				const sorted = [...this.selectedBlocks].sort((a, b) => a - b)
+				this.clipboard = sorted.map(i => JSON.parse(JSON.stringify(this.blocks[i])))
+			},
+			cutSelected() {
+				this.copySelected()
+				this.deleteSelected()
+			},
+			pasteAfter() {
+				if (!this.clipboard.length) return
+				const idx = this.focusedIdx >= 0 ? this.focusedIdx : this.blocks.length - 1
+				const copies = this.clipboard.map(b => ({ ...b, id: this._nextId++ }))
+				this.blocks.splice(idx + 1, 0, ...copies)
+				this.selectionMode = false
+				this.selectedBlocks = []
+				this.focusedIdx = idx + copies.length
+				this.autoSave()
+			},
+			deleteSelected() {
+				if (!this.selectedBlocks.length) return
+				const sorted = [...this.selectedBlocks].sort((a, b) => b - a)
+				sorted.forEach(i => this.blocks.splice(i, 1))
+				if (this.blocks.length === 0) {
+					this.blocks.push(this.newBlock('action'))
+				}
+				this.selectedBlocks = []
+				this.focusedIdx = Math.min(this.focusedIdx, this.blocks.length - 1)
+				this.autoSave()
+			},
+
+			// ── save ────────────────────────────────────────
+			autoSave() {
+				try {
+					localStorage.setItem(STORAGE_KEY, JSON.stringify({
+						title: this.scriptTitle,
+						blocks: this.blocks,
+					}))
+					this.hasUnsavedChanges = false
+				} catch(e) {}
+			},
+			saveFile() {
+				this.autoSave()
+				alert('已保存到本地存储')
+			},
+		},
+		watch: {
+			scriptTitle() { this.autoSave() },
+		},
+		mounted() {
+			window.addEventListener('resize', () => {
+				this.isMobile = window.innerWidth < 768
+			})
+		},
+		template: `
+			<div class="sp-editor" :class="{ 'sp-mobile': isMobile }">
+				<div class="sp-topbar">
+					<div style="display:flex;align-items:center;gap:8px;">
+						<input v-model="scriptTitle" style="background:transparent;border:none;color:#fff;font-size:16px;min-width:120px;" />
+						<span v-if="hasUnsavedChanges" style="color:#f38ba8;font-size:12px;">●</span>
+					</div>
+					<div>
+						<button @click="saveFile" style="background:#89b4fa;border:none;padding:6px 12px;border-radius:4px;cursor:pointer;font-size:13px;">保存</button>
+					</div>
+				</div>
+				<div class="sp-layout">
+					<div class="sp-script-area">
+						<div class="sp-page">
+							<div
+								v-for="(block, idx) in blocks"
+								:key="block.id"
+								class="sp-block"
+								:class="{ 'sp-block-selected': isSelected(idx) }"
+								@click="onBlockClick(idx)"
+							>
+								<span v-if="focusedIdx === idx && !selectionMode" style="font-size:10px;color:#6c7086;display:block;">{{ shortLabel(block.type) }}</span>
+								<span v-if="selectionMode" class="sp-select-indicator" :class="{ 'sp-selected': isSelected(idx) }">{{ isSelected(idx) ? '✓' : '○' }}</span>
+								<textarea
+									:ref="'ta-' + idx"
+									class="sp-ta"
+									:class="'sp-ta-' + block.type"
+									v-model="block.text"
+									:placeholder="placeholder(block.type)"
+									rows="1"
+									:readonly="selectionMode"
+									@keydown="onKeydown($event, idx)"
+									@input="onInput($event, idx)"
+									@focus="onFocus(idx)"
+								></textarea>
+							</div>
+						</div>
+					</div>
+				</div>
+				<div v-if="isMobile" class="sp-mobile-bar">
+					<div class="sp-mobile-actions">
+						<button
+							class="sp-action-btn"
+							:class="{ 'sp-action-active': selectionMode }"
+							@click="toggleSelectionMode"
+						>{{ selectionMode ? '取消' : '選擇' }}</button>
+						<button
+							class="sp-action-btn"
+							:disabled="!canActOnSelection"
+							@click="copySelected"
+						>複製</button>
+						<button
+							class="sp-action-btn"
+							:disabled="!canActOnSelection"
+							@click="cutSelected"
+						>剪切</button>
+						<button
+							class="sp-action-btn"
+							:disabled="!canPaste"
+							@click="pasteAfter"
+						>貼上</button>
+						<button
+							class="sp-action-btn sp-action-danger"
+							:disabled="!canActOnSelection"
+							@click="deleteSelected"
+						>刪除</button>
+						<div class="sp-mobile-divider"></div>
+					</div>
+					<div class="sp-mobile-types">
+						<button
+							v-for="et in elementTypes"
+							:key="et.id"
+							:class="{ active: currentBlockType === et.id }"
+							@click="setCurrentType(et.id)"
+						>{{ et.shortLabel }}</button>
+					</div>
+					<div class="sp-mobile-stats">
+						<span v-if="selectionMode">已選 {{ selectedBlocks.length }}</span>
+						<span v-else>{{ blocks.length }} 塊</span>
+					</div>
+				</div>
+			</div>
+		`
+	})
+}

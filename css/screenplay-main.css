@@ -1,0 +1,110 @@
+/* ── base ── */
+.app-screenplay, #app-content-vue { height: 100%; }
+
+/* ════ FILE LIST ════ */
+.sp-list-screen {
+  max-width: 600px; margin: 40px auto; padding: 0 20px;
+}
+.sp-list-header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 24px;
+}
+.sp-list-title { color: #cdd6f4; font-size: 22px; margin: 0; }
+.sp-new-btn {
+  background: #89b4fa; color: #1e1e2e; border: none;
+  padding: 8px 16px; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 600;
+}
+.sp-new-btn:hover { background: #b4d0fb; }
+.sp-file-list { list-style: none; padding: 0; margin: 0; }
+.sp-file-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 14px 18px; margin-bottom: 8px;
+  background: #313244; border-radius: 10px; cursor: pointer;
+  transition: background 0.15s;
+}
+.sp-file-item:hover { background: #45475a; }
+.sp-file-icon { font-size: 18px; }
+.sp-file-name { color: #cdd6f4; font-size: 15px; }
+.sp-list-loading, .sp-list-empty { color: #6c7086; text-align: center; padding: 40px 0; }
+.sp-list-error { color: #f38ba8; text-align: center; padding: 20px 0; }
+
+/* ════ EDITOR ════ */
+.sp-editor { height: 100%; display: flex; flex-direction: column; background: #1e1e2e; padding-right: 58px; box-sizing: border-box; }
+
+.sp-topbar {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 14px; background: #27273a; flex-shrink: 0; min-height: 48px;
+}
+.sp-back-btn {
+  background: transparent; border: 1px solid #45475a; color: #cdd6f4;
+  padding: 5px 10px; border-radius: 6px; cursor: pointer; font-size: 13px; white-space: nowrap;
+}
+.sp-back-btn:hover { background: #313244; }
+.sp-save-btn {
+  background: #89b4fa; border: none; color: #1e1e2e;
+  padding: 5px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 600; white-space: nowrap;
+}
+.sp-save-btn:disabled { opacity: 0.6; }
+
+.sp-layout { flex: 1; overflow: hidden; display: flex; }
+.sp-script-area { flex: 1; overflow-y: auto; padding: 30px 20px; padding-right: 78px; }
+.sp-page {
+  max-width: 8.5in; margin: 0 auto; background: #1e1e2e;
+  min-height: 60vh; padding: 40px 60px;
+}
+
+/* ── blocks ── */
+.sp-block { margin-bottom: 8px; position: relative; border-radius: 4px; }
+.sp-block-selected { background: rgba(137,180,250,.12); outline: 1px solid #89b4fa; border-radius: 4px; }
+.sp-block-label { display: block; font-size: 10px; color: #6c7086; margin-bottom: 2px; }
+.sp-select-indicator { display: inline-block; width: 20px; font-size: 13px; color: #89b4fa; cursor: pointer; user-select: none; vertical-align: middle; }
+
+/* ── textarea types ── */
+.sp-ta {
+  width: 100%; background: transparent; border: none; color: #cdd6f4;
+  font-family: 'Courier New', monospace; font-size: 14px; line-height: 1.6;
+  resize: none; outline: none; display: block; box-sizing: border-box;
+}
+.sp-ta-scene-heading { text-transform: uppercase; font-weight: bold; font-size: 15px; }
+.sp-ta-character { text-align: center; text-transform: uppercase; margin: 0 25%; width: 50%; }
+.sp-ta-parenthetical { text-align: center; margin: 0 20%; width: 60%; color: #a6adc8; }
+.sp-ta-dialogue { margin: 0 15%; width: 70%; }
+.sp-ta-transition { text-align: right; text-transform: uppercase; color: #a6adc8; }
+
+/* ════ SIDEBAR (always show) ════ */
+.sp-mobile-bar {
+  display: flex; flex-direction: column;
+  position: fixed; right: 0; top: 48px; bottom: 0; width: 58px;
+  background: #27273a; border-left: 1px solid #3a3a50;
+  padding: 6px 4px; gap: 3px; z-index: 200; overflow-y: auto;
+}
+
+@media (max-width: 768px) {
+  /* 用 fixed 定位让编辑器占满视口，解决 iOS Safari height:100% 继承断链导致无法滚动 */
+  .sp-editor {
+    position: fixed; top: 50px; left: 0; right: 0; bottom: 0;
+    width: 100vw; max-width: 100vw; height: auto;
+    display: flex; flex-direction: column;
+  }
+  .sp-page { padding: 16px; max-width: 100%; min-height: unset; }
+  .sp-script-area {
+    padding: 10px;
+    padding-right: 66px;
+    padding-bottom: calc(100px + env(safe-area-inset-bottom, 0px));
+  }
+
+  /* 移动端剧本格式缩进 */
+  .sp-ta-character {
+    margin: 0; width: 100%;
+    text-align: center; text-transform: uppercase;
+  }
+  .sp-ta-parenthetical {
+    margin: 0; width: 100%;
+    padding-left: 12%; padding-right: 8%;
+    text-align: left; color: #a6adc8;
+  }
+  .sp-ta-dialogue {
+    margin: 0; width: 100%;
+    padding-left: 8%; padding-right: 5%;
+  }
+}
