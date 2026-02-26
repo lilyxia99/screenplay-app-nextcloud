@@ -338,7 +338,7 @@ function showExportModal() {
       </select>
     </div>
     <div class="sp-settings-row">
-      <label>基础页边距 (in)</label>
+      <label>页边距 (in)</label>
       <input type="number" id="pmargin" value="1.0" step="0.1" style="width:60px">
     </div>
     <div style="margin-top:24px; text-align:right;">
@@ -358,7 +358,7 @@ function showExportModal() {
     var margin = modal.querySelector('#pmargin').value + 'in';
     overlay.remove();
 
-    // 1. 彻底重建打印容器，挂载在 body 根节点下
+    // 1. 准备打印容器，挂载在 body 根节点
     var printArea = document.getElementById('print-area');
     if (printArea) printArea.remove(); 
     printArea = document.createElement('div');
@@ -369,25 +369,33 @@ function showExportModal() {
     document.documentElement.style.setProperty('--print-size', size);
     document.documentElement.style.setProperty('--print-margin', margin);
 
-    // 3. 构建打印专用 HTML 序列
+    // 3. 构建打印专用 HTML 内容
     st.blocks.forEach(function(b) {
-      var text = b.text.trim();
-      // 场景标题必须保留（即使为空也显示 UNTITLED），其他空块不占用打印空间
+      var text = (b.text || '').trim();
+      // 场景标题允许为空，其他空块跳过
       if (!text && b.type !== 'scene-heading') return;
 
       var div = document.createElement('div');
-      // 这里的类名必须匹配你 CSS @media print 中的 .p-block 和 .p-类型
       div.className = 'p-block p-' + b.type;
       div.textContent = text || (b.type === 'scene-heading' ? 'INT. UNTITLED SCENE - DAY' : '');
       printArea.appendChild(div);
     });
 
-    // 4. 关键点：给浏览器 500ms 时间重新计算布局高度
-    // 这样可以确保长文档的所有页码都能被正确捕获
+    // 4. 强制干预宿主容器：给 html/body 注入打印状态类
+    document.documentElement.classList.add('sp-printing-active');
+    document.body.classList.add('sp-printing-active');
+
+    // 5. 延迟执行打印，确保 DOM 和样式完全生效
     setTimeout(function() {
       window.print();
-      // 打印完成后可选：printArea.remove(); 
-      // 但通常保留不影响，因为 CSS 设置了非打印模式下隐藏
+      
+      // 打印对话框关闭后（无论点击保存还是取消），移除状态类
+      // 使用 window.onafterprint 监听打印结束
+      window.onafterprint = function() {
+        document.documentElement.classList.remove('sp-printing-active');
+        document.body.classList.remove('sp-printing-active');
+        if (printArea) printArea.remove();
+      };
     }, 500);
   };
 }
