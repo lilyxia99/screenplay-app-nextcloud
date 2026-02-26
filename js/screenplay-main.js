@@ -273,7 +273,7 @@ function openEditor(path, title, blocks) {
 
   var lastSavedDisp = h('span', 'sp-last-saved', '');
   lastSavedDisp.id = 'sp-last-saved';
-  lastSavedDisp.setAttribute('style', 'font-size:11px;color:#6c7086;margin-left:8px;flex:1;text-align:right;');
+  //lastSavedDisp.setAttribute('style', 'font-size:11px;color:#6c7086;margin-left:8px;flex:1;text-align:right;'); // moved to CSS
   topbar.appendChild(lastSavedDisp);
 
   // auto-save every 30 seconds
