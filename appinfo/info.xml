@@ -5,7 +5,7 @@
     <name>Screenplay</name>
     <summary>剧本编辑器</summary>
     <description>专业的剧本编辑器</description>
-    <version>3.0.0</version>
+    <version>3.0.1</version>
     <licence>agpl</licence>
     <author>Claude</author>
     <namespace>Screenplay</namespace>
