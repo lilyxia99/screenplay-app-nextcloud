@@ -256,13 +256,19 @@ function openEditor(path, title, blocks) {
   editor.classList.toggle('sp-mobile', window.innerWidth < 768);
 
   // 窗口缩放监听：处理移动端切换与高度重算
-  window.addEventListener('resize', function() {
+window.addEventListener('resize', function() {
     editor.classList.toggle('sp-mobile', window.innerWidth < 768);
+    
     if (blocksEl) {
       var allTas = blocksEl.querySelectorAll('textarea');
       allTas.forEach(function(ta) {
-        autoH(ta);
+        autoH(ta); // 1. 先重算每个块的高度（因为宽度变窄文字会挤高）
       });
+      
+      // 2. 关键：在所有块高度稳定后，重算分页符位置
+      if (typeof updatePageBreaks === 'function') {
+        updatePageBreaks();
+      }
     }
   });
 
@@ -484,33 +490,39 @@ function updateLabels() {
 function updatePageBreaks() {
   if (!blocksEl) return;
 
-  // 1. 清除旧的分页线
+  // 1. 清除旧的分页符
   blocksEl.querySelectorAll('.sp-page-break-marker').forEach(m => m.remove());
 
-  var pageHeightPx = 1122; // A4 @ 96dpi 约为 1122px
+  // 2. 定义一页的物理参考高度（DPI 换算）
+  // A4 约 1122px, Letter 约 1056px
+  var pageHeightPx = 1122; 
   if (document.getElementById('psize')?.value === 'letter') pageHeightPx = 1056;
 
   var currentTotalHeight = 0;
   var wraps = blocksEl.querySelectorAll('.sp-block');
+  var pageCount = 1;
 
-  wraps.forEach(function(wrap, idx) {
-    // 获取当前块的高度（包含 margin）
-    var h = wrap.offsetHeight + 8; // 8 是你 CSS 里的 margin-bottom
+  wraps.forEach(function(wrap) {
+    // 获取块的实际占用高度（含 margin）
+    var h = wrap.offsetHeight + 8; 
     currentTotalHeight += h;
 
-    // 如果累计高度超过了页高
+    // 当累计高度超过一页的阈值
     if (currentTotalHeight >= pageHeightPx) {
       var marker = document.createElement('div');
       marker.className = 'sp-page-break-marker';
       
-      // 计算分页线相对于容器顶部的绝对位置
-      // 我们把线放在刚好达到页高的地方
-      marker.style.top = (currentTotalHeight - (currentTotalHeight % pageHeightPx)) + 'px';
+      // 关键：将分页符精准挂在触发分页的那个 Block 顶部
+      // 模拟 Word 的缝隙感
+      marker.style.top = (wrap.offsetTop) + 'px';
+      
+      // 显示页码提示
+      marker.setAttribute('data-page', 'PAGE ' + (++pageCount));
       
       blocksEl.appendChild(marker);
       
-      // 重置计数，寻找下一个分页点
-      currentTotalHeight = currentTotalHeight % pageHeightPx;
+      // 重置计数：减去一页的高度，继续累加剩余部分
+      currentTotalHeight -= pageHeightPx;
     }
   });
 }
@@ -519,8 +531,8 @@ function updatePageBreaks() {
 function autoH(ta) { 
   ta.style.height = 'auto'; 
   ta.style.height = ta.scrollHeight + 'px'; 
-  // 输入时实时重算分页位置
-  updatePageBreaks();
+  // 只要文字变多导致高度变化，就重算分页
+  updatePageBreaks(); 
 }
 
 // 修改 renderBlocks，在渲染完后初始计算一次
