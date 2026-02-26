@@ -39,10 +39,7 @@
         out.push(s);
         out.push('');
       } else if (t === 'character') {
-        // 如果前一个是对话或括注，说明是角色→对话→角色新段落，不需要在角色前加空行
-        if (prevType !== 'dialogue' && prevType !== 'parenthetical') {
-          out.push('');
-        }
+        out.push('');
         out.push(s.toUpperCase());
       } else if (t === 'parenthetical') {
         out.push(s.startsWith('(') ? s : '(' + s + ')');
@@ -325,7 +322,6 @@
       }
     }, 30000);
 
-    /* ════ Layout ════ */
     var layout = h('div', 'sp-layout');
     var area = h('div', 'sp-script-area');
     var page = h('div', 'sp-page');
@@ -339,6 +335,19 @@
     editor.appendChild(layout);
     editor.appendChild(mobileBarEl);
     root.appendChild(editor);
+
+    // 全局滑动监听 (利用 elementFromPoint 避免元素被 renderBlocks 销毁导致事件中断)
+    layout.addEventListener('mousemove', function (e) {
+      if (st.selectionMode && isDraggingSelection) {
+        var el = document.elementFromPoint(e.clientX, e.clientY);
+        if (el && el.classList.contains('sp-select-indicator')) {
+          var hoveredIdx = parseInt(el.dataset.idx, 10);
+          if (!isNaN(hoveredIdx) && hoveredIdx !== lastSelectedIdx) {
+            toggleSel(hoveredIdx, false, true, dragSelState);
+          }
+        }
+      }
+    });
 
     renderBlocks();
     renderBar();
@@ -463,6 +472,9 @@
       if (st.selectionMode) {
         var sel = h('span', 'sp-select-indicator' + (isSel ? ' sp-selected' : ''), isSel ? '✓' : '○');
 
+        // 记录一下这个元素在其父级列表里的 idx 数据，方便后续通过 DOM 获取
+        sel.dataset.idx = idx;
+
         // 鼠标按下：可以是普通单选，也可以是 Shift 多选，同时开启拖拽模式
         sel.addEventListener('mousedown', (function (i, currentIsSel) {
           return function (e) {
@@ -472,15 +484,6 @@
             toggleSel(i, e.shiftKey, false, null);
           };
         })(idx, isSel));
-
-        // 鼠标进入（拖拽经过）：如果正在拖拽，应用拖拽的选中/取消状态
-        sel.addEventListener('mouseenter', (function (i) {
-          return function (e) {
-            if (isDraggingSelection) {
-              toggleSel(i, false, true, dragSelState);
-            }
-          };
-        })(idx));
 
         wrap.appendChild(sel);
       } else if (st.focusedIdx === idx) {
