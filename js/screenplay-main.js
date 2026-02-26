@@ -266,12 +266,13 @@
       editor.classList.toggle('sp-mobile', window.innerWidth < 768);
       if (blocksEl) {
         var allTas = blocksEl.querySelectorAll('textarea');
-        allTas.forEach(function (ta) {
-          autoH(ta); // 这一步会更新 textarea 的 offsetHeight
-        });
-
-        // 关键：在所有高度更新后，立即重算分页位置
-        updatePageBreaks();
+        // 批量重置高度以减少回流
+        allTas.forEach(function (ta) { ta.style.height = 'auto'; });
+        // 批量设置新高度
+        allTas.forEach(function (ta) { ta.style.height = ta.scrollHeight + 'px'; });
+        if (typeof scheduleUpdatePageBreaks === 'function') {
+          scheduleUpdatePageBreaks();
+        }
       }
     });
 
@@ -494,29 +495,42 @@
     });
   }
 
+  var pageBreakTimer = null;
+  function scheduleUpdatePageBreaks() {
+    if (pageBreakTimer) clearTimeout(pageBreakTimer);
+    pageBreakTimer = setTimeout(updatePageBreaks, 200);
+  }
+
   function updatePageBreaks() {
     if (!blocksEl) return;
 
     // 1. 清除旧的分页符
-    blocksEl.querySelectorAll('.sp-page-break-marker').forEach(m => m.remove());
+    var markers = blocksEl.querySelectorAll('.sp-page-break-marker');
+    for (var i = 0; i < markers.length; i++) {
+      markers[i].remove();
+    }
 
     // 2. 获取当前的物理页高基准 (从导出设置获取，默认 A4)
-    var pSize = document.getElementById('psize')?.value || 'A4';
+    var psizeEl = document.getElementById('psize');
+    var pSize = psizeEl ? psizeEl.value : 'A4';
     var pageHeightPx = (pSize === 'letter') ? 1056 : 1122;
 
-    // 3. 获取编辑器当前的内边距 (模拟打印边距)
-    var paddingTop = 96; // 1英寸 = 96px
-    var currentTotalHeight = paddingTop;
+    // 3. 模拟打印边距 (上下各1英寸=96px)
+    var topMargin = 96;
+    var bottomMargin = 96;
+    var usableHeight = pageHeightPx - topMargin - bottomMargin;
+
+    var currentFilled = 0;
     var pageCount = 1;
 
     var wraps = blocksEl.querySelectorAll('.sp-block');
 
     wraps.forEach(function (wrap) {
-      // 获取块的实际物理高度 + 间距
+      // 获取块的实际物理高度 + 间距（模拟打印时占用的高度）
       var blockH = wrap.offsetHeight + 8;
 
-      // 如果加上这个块后超过了当前页的高度
-      if (currentTotalHeight + blockH > pageHeightPx) {
+      // 如果加上这个块后超过了当前页的可用高度
+      if (currentFilled + blockH > usableHeight) {
         // 在这个块之前插入分页符
         var marker = document.createElement('div');
         marker.className = 'sp-page-break-marker';
@@ -526,10 +540,10 @@
         blocksEl.appendChild(marker);
 
         // 重置累加器：新的一页从头开始算
-        currentTotalHeight = paddingTop + blockH;
+        currentFilled = blockH;
         pageCount++;
       } else {
-        currentTotalHeight += blockH;
+        currentFilled += blockH;
       }
     });
   }
@@ -539,14 +553,14 @@
     ta.style.height = 'auto';
     ta.style.height = ta.scrollHeight + 'px';
     // 只要文字变多导致高度变化，就重算分页
-    updatePageBreaks();
+    scheduleUpdatePageBreaks();
   }
 
   // 修改 renderBlocks，在渲染完后初始计算一次
   var _originalRenderBlocks = renderBlocks;
   renderBlocks = function () {
     _originalRenderBlocks();
-    setTimeout(updatePageBreaks, 50); // 等待 DOM 稳定
+    scheduleUpdatePageBreaks(); // 等待 DOM 稳定
   };
   function focusTA(idx) {
     if (!blocksEl) return;
