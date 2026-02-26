@@ -265,11 +265,20 @@
     window.addEventListener('resize', function () {
       editor.classList.toggle('sp-mobile', window.innerWidth < 768);
       if (blocksEl) {
+        var area = document.querySelector('.sp-script-area');
+        var oldOverflow = '';
+        if (area) {
+          oldOverflow = area.style.overflowY;
+          area.style.overflowY = 'scroll'; // 锁定滚动条避免宽度抖动和高度重算错误
+        }
         var allTas = blocksEl.querySelectorAll('textarea');
         // 批量重置高度以减少回流
         allTas.forEach(function (ta) { ta.style.height = 'auto'; });
         // 批量设置新高度
         allTas.forEach(function (ta) { ta.style.height = ta.scrollHeight + 'px'; });
+        if (area) {
+          area.style.overflowY = oldOverflow;
+        }
         if (typeof scheduleUpdatePageBreaks === 'function') {
           scheduleUpdatePageBreaks();
         }
