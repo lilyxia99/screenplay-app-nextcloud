@@ -153,6 +153,7 @@
   background: #1e1e2e;
   min-height: 60vh;
   padding: 40px 60px;
+  position: relative; /* Ensure offsetTop is relative to the page */
 }
 
 /* ── blocks ── */
