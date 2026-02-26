@@ -255,11 +255,9 @@ function openEditor(path, title, blocks) {
   var editor = h('div', 'sp-editor');
   editor.classList.toggle('sp-mobile', window.innerWidth < 768);
 
-  // 修改：在 resize 监听器中加入高度重算逻辑
+  // 窗口缩放监听：处理移动端切换与高度重算
   window.addEventListener('resize', function() {
     editor.classList.toggle('sp-mobile', window.innerWidth < 768);
-    
-    // 核心逻辑：窗口缩放时，遍历所有 block 并重新计算高度
     if (blocksEl) {
       var allTas = blocksEl.querySelectorAll('textarea');
       allTas.forEach(function(ta) {
@@ -268,24 +266,39 @@ function openEditor(path, title, blocks) {
     }
   });
 
-  /* topbar */
+  /* ════ Topbar ════ */
   var topbar = h('div', 'sp-topbar');
 
+  // 返回按钮
   var backBtn = h('button', 'sp-back-btn', '← 返回');
   backBtn.addEventListener('click', function() { reloadList(); });
   topbar.appendChild(backBtn);
 
+  // 标题输入框
   var titleInput = h('input');
   titleInput.value = st.currentTitle;
   titleInput.setAttribute('style', 'background:transparent;border:none;color:#fff;font-size:16px;min-width:80px;flex:1;outline:none;padding:0 8px;');
   titleInput.addEventListener('input', function() { st.currentTitle = titleInput.value; });
   topbar.appendChild(titleInput);
 
+  // 保存状态显示
   var lastSavedDisp = h('span', 'sp-last-saved', '');
   lastSavedDisp.id = 'sp-last-saved';
   topbar.appendChild(lastSavedDisp);
 
-  // auto-save every 30 seconds
+  // 导出按钮 (新集成)
+  var exportBtn = h('button', 'sp-back-btn', '导出 PDF');
+  exportBtn.style.marginLeft = '10px';
+  exportBtn.addEventListener('click', function() {
+    if (typeof showExportModal === 'function') {
+      showExportModal();
+    } else {
+      alert('导出模块尚未就绪');
+    }
+  });
+  topbar.appendChild(exportBtn);
+
+  // 自动保存逻辑 (30秒)
   if (st.autoSaveTimer) clearInterval(st.autoSaveTimer);
   st.autoSaveTimer = setInterval(function() {
     if (st.blocks && st.blocks.length > 0) {
@@ -293,7 +306,7 @@ function openEditor(path, title, blocks) {
     }
   }, 30000);
 
-  /* layout */
+  /* ════ Layout ════ */
   var layout = h('div', 'sp-layout');
   var area = h('div', 'sp-script-area');
   var page = h('div', 'sp-page');
@@ -310,6 +323,54 @@ function openEditor(path, title, blocks) {
 
   renderBlocks();
   renderBar();
+}
+
+function showExportModal() {
+    var overlay = h('div', 'sp-modal-overlay');
+    var modal = h('div', 'sp-modal');
+    modal.innerHTML = `
+        <h3>打印设置</h3>
+        <div class="sp-settings-row">
+            <label>纸张</label>
+            <select id="psize"><option value="A4">A4</option><option value="letter">Letter</option></select>
+        </div>
+        <div class="sp-settings-row">
+            <label>页边距 (in)</label>
+            <input type="number" id="pmargin" value="1.0" step="0.1" style="width:60px">
+        </div>
+        <div style="text-align:right; margin-top:20px;">
+            <button id="p-cancel" style="margin-right:8px; background:none; border:none; color:#666;">取消</button>
+            <button id="p-exec" style="background:#27ae60; color:white; border:none; padding:6px 16px; border-radius:4px;">生成 PDF</button>
+        </div>
+    `;
+    overlay.appendChild(modal);
+    document.body.appendChild(overlay);
+
+    modal.querySelector('#p-cancel').onclick = function() { overlay.remove(); };
+    modal.querySelector('#p-exec').onclick = function() {
+        var size = modal.querySelector('#psize').value;
+        var margin = modal.querySelector('#pmargin').value + 'in';
+        overlay.remove();
+        
+        // 准备打印内容
+        var printArea = document.getElementById('print-area') || h('div');
+        printArea.id = 'print-area';
+        printArea.innerHTML = '';
+        
+        // 设置 CSS 变量给 @page 使用
+        document.documentElement.style.setProperty('--print-size', size);
+        document.documentElement.style.setProperty('--print-margin', margin);
+
+        // 转换 blocks 为打印节点
+        st.blocks.forEach(function(b) {
+            if (!b.text.trim()) return;
+            var div = h('div', 'p-block p-' + b.type, b.text);
+            printArea.appendChild(div);
+        });
+        
+        document.body.appendChild(printArea);
+        window.print();
+    };
 }
 
 function reloadList() {
