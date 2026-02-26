@@ -366,20 +366,26 @@
 }
 
 /* 3. 打印专用样式 (PDF标准) */
+/* 3. 打印专用样式 (PDF 标准优化版) */
 @media print {
-    /* 1. 确保 body 和容器允许长内容溢出到多页 */
     html, body {
         height: auto !important;
         overflow: visible !important;
+        background: #fff !important;
     }
 
     body > *:not(#print-area) {
         display: none !important;
     }
 
+    /* 核心修改：将基础页边距直接给到纸张 */
+    @page {
+        margin: var(--print-margin, 1in); /* 这里的 1in 是基础留白 */
+        size: var(--print-size, A4);
+    }
+
     #print-area {
         display: block !important;
-        position: relative; /* 改为 relative 确保流式布局 */
         width: 100%;
         background: #fff !important;
         color: #000 !important;
@@ -387,40 +393,57 @@
         font-size: 12pt;
     }
 
-    @page {
-        margin: var(--print-margin, 1in);
-        size: var(--print-size, A4);
-    }
-
-    /* 2. 防止文字被横切的核心设置 */
     .p-block {
         margin: 0;
         line-height: 1.2;
         white-space: pre-wrap;
         padding: 6pt 0;
-        width: 100% !important;
-        
-        /* 告诉浏览器：不要在元素中间断页 */
-        break-inside: avoid; 
-        page-break-inside: avoid; 
+        box-sizing: border-box;
+        break-inside: avoid;
     }
 
-    /* 3. 针对剧本特定格式的打印优化 */
+    /* --- 打印时的对齐逻辑（基于 A4 纸张宽度自动居中） --- */
+
+    /* 场景标题：左对齐，全宽 */
     .p-scene-heading { 
         font-weight: bold; 
         text-transform: uppercase; 
         margin-top: 24pt; 
-        break-after: avoid; /* 场景标题后不要立即断页，至少带一行动作 */
     }
+
+    /* 角色名：在纸张中间区域水平居中 */
     .p-character { 
         width: 4in !important; 
-        margin-left: 2in !important; 
+        margin: 12pt auto 0 auto !important; /* 使用 auto 左右边距实现物理居中 */
         text-align: center; 
-        text-transform: uppercase; 
-        margin-top: 12pt;
-        break-after: avoid; /* 角色名后不要立即断页 */
+        text-transform: uppercase;
     }
-    .p-parenthetical { width: 3in !important; margin-left: 2.5in !important; font-size: 11pt; }
-    .p-dialogue { width: 4in !important; margin-left: 1.5in !important; }
-    .p-transition { text-align: right; text-transform: uppercase; margin-top: 12pt; }
+
+    /* 括注：比角色名稍宽，同样物理居中 */
+    .p-parenthetical { 
+        width: 3.5in !important; 
+        margin: 0 auto !important; 
+        text-align: center; 
+        font-size: 11pt; 
+    }
+
+    /* 对话：标准剧本宽度约为 3.5in - 4in，居中放置 */
+    .p-dialogue { 
+        width: 3.8in !important; 
+        margin: 0 auto !important; 
+        text-align: left; /* 对话本身通常还是左对齐 */
+    }
+
+    /* 动作：铺满纸张可用宽度 */
+    .p-action { 
+        width: 100%; 
+        margin-top: 12pt; 
+    }
+
+    /* 转场：强制右对齐 */
+    .p-transition { 
+        text-align: right; 
+        text-transform: uppercase; 
+        margin-top: 12pt; 
+    }
 }
