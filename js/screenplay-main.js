@@ -452,6 +452,9 @@
   /* ── blocks ── */
   function renderBlocks() {
     if (!blocksEl) return;
+    var area = document.querySelector('.sp-script-area');
+    var stTop = area ? area.scrollTop : 0;
+
     blocksEl.innerHTML = '';
     st.blocks.forEach(function (block, idx) {
       var isSel = st.selectedBlocks.indexOf(idx) >= 0;
@@ -489,8 +492,13 @@
       }
       wrap.appendChild(ta);
       blocksEl.appendChild(wrap);
-      autoH(ta);
+
+      // 不在这里 autoH，放入统一计算，避免触发布局抖动
     });
+
+    if (area) {
+      area.scrollTop = stTop;
+    }
   }
 
   function updateLabels() {
