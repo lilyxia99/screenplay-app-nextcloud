@@ -329,77 +329,69 @@ function showExportModal() {
   var overlay = h('div', 'sp-modal-overlay');
   var modal = h('div', 'sp-modal');
   modal.innerHTML = `
-    <h3>剧本导出设置</h3>
+    <h3>剧本导出与分页参考</h3>
     <div class="sp-settings-row">
       <label>纸张规格</label>
       <select id="psize">
-        <option value="A4">A4 (Standard)</option>
-        <option value="letter">Letter (US)</option>
+        <option value="A4">A4 (影响分页线高度)</option>
+        <option value="letter">Letter</option>
       </select>
     </div>
     <div class="sp-settings-row">
       <label>页边距 (in)</label>
       <input type="number" id="pmargin" value="1.0" step="0.1" style="width:60px">
     </div>
-    <div style="margin-top:24px; text-align:right;">
-      <button id="p-cancel" style="margin-right:12px; background:none; border:none; color:#949cbb; cursor:pointer;">取消</button>
-      <button id="p-exec" style="background:#89b4fa; color:#1e1e2e; border:none; padding:10px 24px; border-radius:8px; font-weight:600; cursor:pointer;">生成 PDF</button>
+    <div style="margin-top:20px; text-align:right;">
+      <button id="p-cancel" style="margin-right:10px; background:none; border:none; color:#949cbb; cursor:pointer;">取消</button>
+      <button id="p-exec" style="background:#89b4fa; color:#1e1e2e; border:none; padding:8px 20px; border-radius:6px; font-weight:600; cursor:pointer;">预览并生成 PDF</button>
     </div>
   `;
   overlay.appendChild(modal);
   document.body.appendChild(overlay);
 
-  // 取消
+  const select = modal.querySelector('#psize');
+  
+  // 切换纸张时立即触发 JS 分页线重绘
+  select.onchange = updatePageBreaks;
+
   modal.querySelector('#p-cancel').onclick = function() { overlay.remove(); };
 
-  // 执行导出
   modal.querySelector('#p-exec').onclick = function() {
-    var size = modal.querySelector('#psize').value;
+    var size = select.value;
     var margin = modal.querySelector('#pmargin').value + 'in';
     overlay.remove();
 
-    // 1. 准备打印容器，挂载在 body 根节点
-    var printArea = document.getElementById('print-area');
-    if (printArea) printArea.remove(); 
-    printArea = document.createElement('div');
+    var printArea = document.getElementById('print-area') || document.createElement('div');
     printArea.id = 'print-area';
+    printArea.innerHTML = '';
     document.body.appendChild(printArea);
 
-    // 2. 传递 CSS 变量给 @page
     document.documentElement.style.setProperty('--print-size', size);
     document.documentElement.style.setProperty('--print-margin', margin);
 
-    // 3. 构建打印专用 HTML 内容
     st.blocks.forEach(function(b) {
-      var text = (b.text || '').trim();
-      // 场景标题允许为空，其他空块跳过
-      if (!text && b.type !== 'scene-heading') return;
-
+      if (!b.text.trim() && b.type !== 'scene-heading') return;
       var div = document.createElement('div');
       div.className = 'p-block p-' + b.type;
-      div.textContent = text || (b.type === 'scene-heading' ? 'INT. UNTITLED SCENE - DAY' : '');
+      div.textContent = b.text.trim() || 'INT. UNTITLED SCENE - DAY';
       printArea.appendChild(div);
     });
 
-    // 4. 强制干预宿主容器：给 html/body 注入打印状态类
     document.documentElement.classList.add('sp-printing-active');
     document.body.classList.add('sp-printing-active');
+    document.body.style.overflow = 'visible';
 
-    // 5. 延迟执行打印，确保 DOM 和样式完全生效
     setTimeout(function() {
       window.print();
-      
-      // 打印对话框关闭后（无论点击保存还是取消），移除状态类
-      // 使用 window.onafterprint 监听打印结束
       window.onafterprint = function() {
         document.documentElement.classList.remove('sp-printing-active');
         document.body.classList.remove('sp-printing-active');
-        if (printArea) printArea.remove();
+        document.body.style.overflow = '';
+        printArea.remove();
       };
     }, 500);
   };
 }
-
 function reloadList() {
   if (st.autoSaveTimer) { clearInterval(st.autoSaveTimer); st.autoSaveTimer = null; }
   st.loading = true;
@@ -489,8 +481,54 @@ function updateLabels() {
   });
 }
 
-function autoH(ta) { ta.style.height = 'auto'; ta.style.height = ta.scrollHeight + 'px'; }
+function updatePageBreaks() {
+  if (!blocksEl) return;
 
+  // 1. 清除旧的分页线
+  blocksEl.querySelectorAll('.sp-page-break-marker').forEach(m => m.remove());
+
+  var pageHeightPx = 1122; // A4 @ 96dpi 约为 1122px
+  if (document.getElementById('psize')?.value === 'letter') pageHeightPx = 1056;
+
+  var currentTotalHeight = 0;
+  var wraps = blocksEl.querySelectorAll('.sp-block');
+
+  wraps.forEach(function(wrap, idx) {
+    // 获取当前块的高度（包含 margin）
+    var h = wrap.offsetHeight + 8; // 8 是你 CSS 里的 margin-bottom
+    currentTotalHeight += h;
+
+    // 如果累计高度超过了页高
+    if (currentTotalHeight >= pageHeightPx) {
+      var marker = document.createElement('div');
+      marker.className = 'sp-page-break-marker';
+      
+      // 计算分页线相对于容器顶部的绝对位置
+      // 我们把线放在刚好达到页高的地方
+      marker.style.top = (currentTotalHeight - (currentTotalHeight % pageHeightPx)) + 'px';
+      
+      blocksEl.appendChild(marker);
+      
+      // 重置计数，寻找下一个分页点
+      currentTotalHeight = currentTotalHeight % pageHeightPx;
+    }
+  });
+}
+
+// 修改原有的 autoH 并在末尾触发计算
+function autoH(ta) { 
+  ta.style.height = 'auto'; 
+  ta.style.height = ta.scrollHeight + 'px'; 
+  // 输入时实时重算分页位置
+  updatePageBreaks();
+}
+
+// 修改 renderBlocks，在渲染完后初始计算一次
+var _originalRenderBlocks = renderBlocks;
+renderBlocks = function() {
+  _originalRenderBlocks();
+  setTimeout(updatePageBreaks, 50); // 等待 DOM 稳定
+};
 function focusTA(idx) {
   if (!blocksEl) return;
   var tas = blocksEl.querySelectorAll('textarea');

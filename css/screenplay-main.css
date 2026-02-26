@@ -317,12 +317,27 @@
 
 /* ════ 导出与分页预览 ════ */
 
-/* 1. 分页预览线：叠加在你原有的背景色上 */
-.sp-page {
-  /* 1056px 约等于 11英寸(A4/Letter高度)，在原有颜色上叠加一条深色线 */
-  background-image: linear-gradient(to bottom, transparent 1055px, #313244 1055px, #313244 1056px);
-  background-size: 100% 1056px;
-  position: relative;
+/* 动态分页线样式 */
+.sp-page-break-marker {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  border-top: 1px dashed #585b70;
+  pointer-events: none;
+  z-index: 10;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.sp-page-break-marker::after {
+  content: "PAGE BREAK";
+  font-size: 10px;
+  color: #585b70;
+  background: #1e1e2e;
+  padding: 0 8px;
+  transform: translateY(-50%);
 }
 
 /* 2. 导出模态框 (UI部分) */
