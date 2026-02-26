@@ -254,8 +254,18 @@ function openEditor(path, title, blocks) {
 
   var editor = h('div', 'sp-editor');
   editor.classList.toggle('sp-mobile', window.innerWidth < 768);
+
+  // 修改：在 resize 监听器中加入高度重算逻辑
   window.addEventListener('resize', function() {
     editor.classList.toggle('sp-mobile', window.innerWidth < 768);
+    
+    // 核心逻辑：窗口缩放时，遍历所有 block 并重新计算高度
+    if (blocksEl) {
+      var allTas = blocksEl.querySelectorAll('textarea');
+      allTas.forEach(function(ta) {
+        autoH(ta);
+      });
+    }
   });
 
   /* topbar */
@@ -273,7 +283,6 @@ function openEditor(path, title, blocks) {
 
   var lastSavedDisp = h('span', 'sp-last-saved', '');
   lastSavedDisp.id = 'sp-last-saved';
-  //lastSavedDisp.setAttribute('style', 'font-size:11px;color:#6c7086;margin-left:8px;flex:1;text-align:right;'); // moved to CSS
   topbar.appendChild(lastSavedDisp);
 
   // auto-save every 30 seconds

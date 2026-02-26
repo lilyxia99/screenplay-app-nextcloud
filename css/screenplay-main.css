@@ -197,6 +197,7 @@
   font-size: 14px;
   line-height: 1.6;
   resize: none;
+  overflow: hidden;
   outline: none;
   display: block;
   box-sizing: border-box;
