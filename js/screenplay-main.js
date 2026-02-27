@@ -22,6 +22,7 @@
     currentPath: null, currentTitle: '未命名劇本',
     blocks: [], focusedIdx: -1,
     selectionMode: false, selectedBlocks: [], clipboard: [],
+    viewMode: 'blocks',
     nextId: 1, lastSaved: null,
   };
 
@@ -335,6 +336,42 @@
     });
     topbar.appendChild(exportBtn);
 
+    // 切换视图按钮
+    var toggleViewBtn = h('button', 'sp-back-btn', '切换视图 (Fountain)');
+    toggleViewBtn.style.marginLeft = '10px';
+    toggleViewBtn.addEventListener('click', function () {
+      if (st.viewMode === 'blocks') {
+        st.viewMode = 'source';
+        toggleViewBtn.textContent = '切换视图 (Blocks)';
+
+        var rawText = blocksToFountain(st.blocks);
+        blocksEl.innerHTML = '';
+        var ta = h('textarea', 'sp-fountain-editor');
+        ta.id = 'sp-fountain-editor';
+        ta.value = rawText;
+
+        ta.addEventListener('input', function () {
+          st.blocks = fountainToBlocks(ta.value);
+        });
+
+        blocksEl.appendChild(ta);
+
+        if (mobileBarEl) mobileBarEl.classList.add('sp-source-active');
+      } else {
+        st.viewMode = 'blocks';
+        toggleViewBtn.textContent = '切换视图 (Fountain)';
+
+        var ta = document.getElementById('sp-fountain-editor');
+        if (ta) {
+          st.blocks = fountainToBlocks(ta.value);
+        }
+
+        if (mobileBarEl) mobileBarEl.classList.remove('sp-source-active');
+        renderBlocks();
+      }
+    });
+    topbar.appendChild(toggleViewBtn);
+
     // 自动保存逻辑 (30秒)
     if (st.autoSaveTimer) clearInterval(st.autoSaveTimer);
     st.autoSaveTimer = setInterval(function () {
@@ -481,6 +518,7 @@
     var filename = title.replace(/[\/\\:*?"<>|]/g, '-') + '.fountain';
     var path = DAV_ROOT + '/' + encodeURIComponent(filename);
     var content = blocksToFountain(st.blocks);
+
     if (btn) { btn.textContent = '保存中…'; btn.disabled = true; }
     saveFileToDav(path, content).then(function () {
       st.currentPath = path;
