@@ -10,6 +10,8 @@
     { id: 'character', shortLabel: '角色', hint: '角色名稱（大寫）' },
     { id: 'parenthetical', shortLabel: '括注', hint: '（語氣／動作）' },
     { id: 'dialogue', shortLabel: '對話', hint: '角色台詞' },
+    { id: 'dialogue-left', shortLabel: '左对白', hint: '// 左侧台词' },
+    { id: 'dialogue-right', shortLabel: '右对白', hint: '\\\\ 右侧台词' },
     { id: 'transition', shortLabel: '轉場', hint: '轉場效果' },
     { id: 'general', shortLabel: '一般', hint: '一般文字' },
   ];
@@ -40,15 +42,16 @@
         out.push('');
       } else if (t === 'character') {
         out.push('');
+        out.push('');
         out.push(s.toUpperCase());
       } else if (t === 'parenthetical') {
         out.push(s.startsWith('(') ? s : '(' + s + ')');
       } else if (t === 'dialogue') {
-        // 如果前一个也是对话，说明是同一段对话的多个段落，加一个空行分隔
-        /*if (prevType === 'dialogue') {
-          out.push('');
-        }*/
         out.push(s);
+      } else if (t === 'dialogue-left') {
+        out.push('// ' + s);
+      } else if (t === 'dialogue-right') {
+        out.push('\\\\ ' + s);
       } else if (t === 'transition') {
         out.push('');
         out.push('> ' + s.toUpperCase());
@@ -89,13 +92,31 @@
           i++;
           while (i < lines.length && lines[i].trim()) {
             var dl = lines[i].trim();
-            if (dl.startsWith('(')) blocks.push({ id: id++, type: 'parenthetical', text: dl });
-            else blocks.push({ id: id++, type: 'dialogue', text: dl });
+            if (dl.startsWith('//')) {
+              blocks.push({ id: id++, type: 'dialogue-left', text: dl.replace(/^\/\/\s*/, '') });
+            } else if (dl.startsWith('\\\\')) {
+              blocks.push({ id: id++, type: 'dialogue-right', text: dl.replace(/^\\\\\s*/, '') });
+            } else if (dl.startsWith('(')) {
+              blocks.push({ id: id++, type: 'parenthetical', text: dl });
+            } else {
+              blocks.push({ id: id++, type: 'dialogue', text: dl });
+            }
             i++;
           }
           continue;
         }
       }
+
+      // standalone left/right dialogue outside character block
+      if (line.startsWith('//')) {
+        blocks.push({ id: id++, type: 'dialogue-left', text: line.replace(/^\/\/\s*/, '') });
+        i++; continue;
+      }
+      if (line.startsWith('\\\\')) {
+        blocks.push({ id: id++, type: 'dialogue-right', text: line.replace(/^\\\\\s*/, '') });
+        i++; continue;
+      }
+
       // parenthetical
       if (line.startsWith('(') && line.endsWith(')')) {
         blocks.push({ id: id++, type: 'parenthetical', text: line });
@@ -397,12 +418,35 @@
       document.documentElement.style.setProperty('--print-size', size);
       document.documentElement.style.setProperty('--print-margin', margin);
 
+      var dualDialogContainer = null;
+
       st.blocks.forEach(function (b) {
         if (!b.text.trim() && b.type !== 'scene-heading') return;
+
         var div = document.createElement('div');
         div.className = 'p-block p-' + b.type;
         div.textContent = b.text.trim() || 'INT. UNTITLED SCENE - DAY';
-        printArea.appendChild(div);
+
+        if (b.type === 'dialogue-left') {
+          if (!dualDialogContainer) {
+            dualDialogContainer = document.createElement('div');
+            dualDialogContainer.className = 'p-dual-dialogue';
+            printArea.appendChild(dualDialogContainer);
+          }
+        } else if (b.type !== 'dialogue-right') {
+          dualDialogContainer = null;
+        }
+
+        if (dualDialogContainer && (b.type === 'dialogue-left' || b.type === 'dialogue-right')) {
+          dualDialogContainer.appendChild(div);
+          if (b.type === 'dialogue-right') {
+            dualDialogContainer = null;
+          }
+        } else {
+          if (!dualDialogContainer) {
+            printArea.appendChild(div);
+          }
+        }
       });
 
       document.documentElement.classList.add('sp-printing-active');
@@ -465,9 +509,24 @@
     var stTop = area ? area.scrollTop : 0;
 
     blocksEl.innerHTML = '';
+
+    var dualDialogContainer = null;
+
     st.blocks.forEach(function (block, idx) {
       var isSel = st.selectedBlocks.indexOf(idx) >= 0;
       var wrap = h('div', 'sp-block' + (isSel ? ' sp-block-selected' : ''));
+
+      // If we are dealing with a right dialogue and there's an open container, we keep using it.
+      // Otherwise, we must check if we should create a new container.
+      if (block.type === 'dialogue-left') {
+        if (!dualDialogContainer) {
+          dualDialogContainer = h('div', 'sp-dual-dialogue');
+          blocksEl.appendChild(dualDialogContainer);
+        }
+      } else if (block.type !== 'dialogue-right') {
+        // If it's not a right dialogue, break any open dual dialogue container
+        dualDialogContainer = null;
+      }
 
       if (st.selectionMode) {
         var sel = h('span', 'sp-select-indicator' + (isSel ? ' sp-selected' : ''), isSel ? '✓' : '○');
@@ -513,7 +572,19 @@
         ta.addEventListener('click', (function (i) { return function () { toggleSel(i); }; })(idx));
       }
       wrap.appendChild(ta);
-      blocksEl.appendChild(wrap);
+
+      if (dualDialogContainer && (block.type === 'dialogue-left' || block.type === 'dialogue-right')) {
+        dualDialogContainer.appendChild(wrap);
+        if (block.type === 'dialogue-right') {
+          // Typically the container only holds one left and one right, so close it after right
+          dualDialogContainer = null;
+        }
+      } else {
+        // standalone or left-dialogue without a clear pair might just stay in its own container or normal block
+        if (!dualDialogContainer) {
+          blocksEl.appendChild(wrap);
+        }
+      }
 
       // 不在这里 autoH，放入统一计算，避免触发布局抖动
     });
